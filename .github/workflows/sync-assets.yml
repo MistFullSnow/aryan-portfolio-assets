@@ -1,0 +1,69 @@
+name: Sync Assets To Sheet
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Build Asset List
+        run: |
+
+          python << EOF
+
+          import os
+          import json
+
+          files = []
+
+          for root, dirs, filenames in os.walk("."):
+
+              if ".git" in root:
+                  continue
+
+              for file in filenames:
+
+                  path = os.path.join(root, file)
+
+                  path = path.replace("\\","/")
+
+                  if path.startswith("./"):
+                      path = path[2:]
+
+                  ext = file.split(".")[-1].lower()
+
+                  if ext in ["png","jpg","jpeg","webp","gif"]:
+                      type_ = "Image"
+                  elif ext == "pdf":
+                      type_ = "PDF"
+                  else:
+                      type_ = "Other"
+
+                  files.append({
+                      "name": file,
+                      "type": type_,
+                      "folder": os.path.dirname(path),
+                      "url":
+                      f"https://cdn.jsdelivr.net/gh/MistFullSnow/aryan-portfolio-assets@main/{path}"
+                  })
+
+          with open("assets.json","w") as f:
+              json.dump({"files": files}, f)
+
+          EOF
+
+      - name: Send To Apps Script
+        run: |
+
+          curl \
+            -X POST \
+            -H "Content-Type: application/json" \
+            --data @assets.json \
+            "${{ secrets.APPS_SCRIPT_URL }}"
