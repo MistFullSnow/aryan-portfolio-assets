@@ -10,58 +10,69 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - uses: actions/checkout@v4
-
-      - name: Build Asset List
+      - name: Generate Asset Manifest
         run: |
-
-          python << EOF
-
+          python << 'EOF'
           import os
           import json
+          from urllib.parse import quote
 
           files = []
 
+          OWNER = "MistFullSnow"
+          REPO = "aryan-portfolio-assets"
+          BRANCH = "main"
+
           for root, dirs, filenames in os.walk("."):
 
+              # Ignore git files
               if ".git" in root:
                   continue
 
-              for file in filenames:
+              for filename in filenames:
 
-                  path = os.path.join(root, file)
+                  path = os.path.join(root, filename)
 
-                  path = path.replace("\\","/")
+                  # Convert to forward slashes
+                  path = path.replace("\\", "/")
 
+                  # Remove leading ./
                   if path.startswith("./"):
                       path = path[2:]
 
-                  ext = file.split(".")[-1].lower()
+                  ext = filename.split(".")[-1].lower()
 
-                  if ext in ["png","jpg","jpeg","webp","gif"]:
-                      type_ = "Image"
+                  if ext in ["jpg", "jpeg", "png", "gif", "webp", "svg"]:
+                      file_type = "Image"
                   elif ext == "pdf":
-                      type_ = "PDF"
+                      file_type = "PDF"
                   else:
-                      type_ = "Other"
+                      file_type = "Other"
+
+                  folder = os.path.dirname(path)
+                  if not folder:
+                      folder = "Root"
 
                   files.append({
-                      "name": file,
-                      "type": type_,
-                      "folder": os.path.dirname(path),
-                      "url":
-                      f"https://cdn.jsdelivr.net/gh/MistFullSnow/aryan-portfolio-assets@main/{path}"
+                      "name": filename,
+                      "type": file_type,
+                      "folder": folder,
+                      "url": f"https://cdn.jsdelivr.net/gh/{OWNER}/{REPO}@{BRANCH}/{quote(path)}"
                   })
 
-          with open("assets.json","w") as f:
-              json.dump({"files": files}, f)
+          payload = {"files": files}
 
+          with open("assets.json", "w", encoding="utf-8") as f:
+              json.dump(payload, f, indent=2)
+
+          print(f"Generated {len(files)} assets")
           EOF
 
       - name: Send To Apps Script
         run: |
-
           curl \
             -X POST \
             -H "Content-Type: application/json" \
